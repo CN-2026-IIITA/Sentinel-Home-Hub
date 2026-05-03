@@ -2,11 +2,9 @@
 **A Computer Networks Project**
 
 Sentinel Home Hub is a lightweight, efficient Publisher/Subscriber (Pub/Sub) messaging system designed specifically for Smart Home environments. The project aims to build a centralized broker that facilitates low-latency, reliable communication between various IoT devices, sensors, and user interfaces within a local network.
-
-As an educational project, the core focus is on implementing fundamental networking concepts, custom communication protocols, and efficient message routing algorithms from scratch.
 ---
 
-## 🏗️ Architecture Overview
+##  Architecture Overview
 
 The system is built on a classic **Broker-centric Publisher/Subscriber** model. This architecture decouples the devices producing data from the devices consuming data, allowing for a highly scalable and flexible network.
 
@@ -15,7 +13,7 @@ The system is built on a classic **Broker-centric Publisher/Subscriber** model. 
 - **Subscribers:** Applications or actuators (e.g., smart thermostats, user dashboards) that express interest in certain topics and receive updates from the broker whenever new data is published.
 ---
 
-## 📊 System Diagrams
+## System Diagrams
 
 ### 1. High-Level Communication Flow
 
@@ -110,7 +108,7 @@ stateDiagram-v2
 
 ---
 
-## 🚀 Planned Specifications
+##  Planned Specifications
 
 The fundamental technical specifications targeted for this project include:
 
