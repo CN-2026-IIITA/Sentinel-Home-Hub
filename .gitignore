@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environments
+venv/
+env/
+.venv/
+
+# Environment/Secret files
+.env
+
+# Project Specific Data & Logs
+*.bin
+*.log
+
+# Executables and object files
+*.o
+*.out
+bin/
+
+# IDE specific files
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
