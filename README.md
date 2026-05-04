@@ -61,32 +61,32 @@ Illustrates the flow of messages from publisher devices to the broker, and final
 ```mermaid
 graph TD
     %% Publishers
-    subgraph Publishers [Smart Devices / Sensors]
-        T[🌡️ Temperature Sensor]
-        F[🔥 Fire Alarm]
-        D[🚪 Door Sensor]
-        L_PUB[💡 Smart Light]
+    subgraph Publishers ["Smart Devices / Sensors"]
+        T["🌡️ Temperature Sensor"]
+        F["🔥 Fire Alarm"]
+        D["🚪 Door Sensor"]
+        L_PUB["💡 Smart Light"]
     end
 
     %% Broker
-    B((Sentinel Broker\nPort 9999))
+    B(("Sentinel Broker<br/>Port 9999"))
 
     %% Subscribers
-    subgraph Subscribers [Clients / Dashboard]
-        A[📱 Phone App]
-        DASH[🖥️ Live Dashboard]
-        S[🔔 Alert System]
+    subgraph Subscribers ["Clients / Dashboard"]
+        A["📱 Phone App"]
+        DASH["🖥️ Live Dashboard"]
+        S["🔔 Alert System"]
     end
 
     %% Flow
-    T -- home/temperature --> B
-    F -- home/fire (Priority 255) --> B
-    D -- home/door --> B
-    L_PUB -- home/light --> B
+    T -- "home/temperature" --> B
+    F -- "home/fire — Priority 255" --> B
+    D -- "home/door" --> B
+    L_PUB -- "home/light" --> B
 
-    B -- Routes by Topic --> A
-    B -- SSE Stream --> DASH
-    B -- Critical Alerts Only --> S
+    B -- "Routes by Topic" --> A
+    B -- "SSE Stream" --> DASH
+    B -- "Critical Alerts Only" --> S
 ```
 
 ### 2. Activity Diagram: Device Lifecycle
@@ -158,19 +158,19 @@ Demonstrates how the broker processes a critical fire alarm over a routine batte
 sequenceDiagram
     participant S1 as Temp Sensor
     participant S2 as Fire Alarm
-    participant B as Broker (QoS Engine)
-    participant C as Phone App (Sub: #)
+    participant B as Broker - QoS Engine
+    participant C as Phone App - All Topics
 
-    C->>B: Connect & Subscribe (All Topics)
+    C->>B: Connect and Subscribe
     
-    S1->>B: Publish (home/temp, Priority: 50)
-    S2->>B: Publish (home/fire, Priority: 255)
+    S1->>B: Publish home/temp, Priority 50
+    S2->>B: Publish home/fire, Priority 255
     
     Note over B: QoS Min-Heap processing
-    B->>B: Sort by Priority (255 > 50)
+    B->>B: Sort by Priority — 255 beats 50
     
-    B->>C: Route 'home/fire' ALARM First!
-    B->>C: Route 'home/temp' Reading Second
+    B->>C: Route home/fire ALARM First!
+    B->>C: Route home/temp Reading Second
 ```
 
 ### 5. Component Architecture
@@ -179,25 +179,25 @@ A breakdown of the internal Python modules inside the Sentinel Hub.
 ```mermaid
 flowchart TD
     subgraph Network Layer
-        TCP[TCP Socket Server<br><code>asyncio</code>]
+        TCP["TCP Socket Server<br/>asyncio"]
     end
 
     subgraph Core Broker Logic
-        Parser[Protocol Decoder<br><code>struct</code>]
-        QoS[Priority Router<br><code>heapq</code>]
+        Parser["Protocol Decoder<br/>struct"]
+        QoS["Priority Router<br/>heapq"]
     end
 
-    subgraph Data & Storage
-        State[Subscriber Registry<br><code>hashlib</code>]
-        Log[(Append-Only Event Log<br><code>broker_log.bin</code>)]
+    subgraph Data and Storage
+        State["Subscriber Registry<br/>hashlib"]
+        Log[("Append-Only Event Log<br/>broker_log.bin")]
     end
 
-    TCP -- Byte Stream --> Parser
-    Parser -- Parsed Messages --> QoS
-    QoS -- Enqueue --> Router[Async Fan-Out Worker]
-    Router -- Lookup --> State
-    Router -- Persist --> Log
-    Router -- Deliver --> TCP
+    TCP -- "Byte Stream" --> Parser
+    Parser -- "Parsed Messages" --> QoS
+    QoS -- "Enqueue" --> Router["Async Fan-Out Worker"]
+    Router -- "Lookup" --> State
+    Router -- "Persist" --> Log
+    Router -- "Deliver" --> TCP
 ```
 
 ---
