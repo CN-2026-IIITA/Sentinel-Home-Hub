@@ -1,7 +1,8 @@
 /* ══════════════════════════════════════════════════════════════
    Smart Home Hub — Live Architecture Visualization
-   Canvas-based animated network topology with particle system
+   Optimized canvas + SSE dashboard with safety limits & UI polish
    ══════════════════════════════════════════════════════════════ */
+
 // ── DOM Elements ────────────────────────────────────────────────
 const topologyCanvas = document.getElementById('topologyCanvas');
 const topologyCtx = topologyCanvas.getContext('2d');
@@ -22,13 +23,21 @@ const offsetSlider = document.getElementById('offsetSlider');
 const offsetCurrent = document.getElementById('offsetCurrent');
 const offsetMax = document.getElementById('offsetMax');
 
-// ── State ───────────────────────────────────────────────────────
+// ── State & Safeguards ──────────────────────────────────────────
 let totalMessages = 0;
 let startTime = Date.now();
 let maxLogOffset = 0;
 const throughputHistory = Array(60).fill(0);
 let currentThroughput = 0;
 let maxThroughput = 50;
+
+// UI Polish & Safety Variables
+const MAX_PARTICLES = 300;       // Prevent GPU crash on heavy load
+const MAX_FEED_ITEMS = 100;      // Prevent DOM bloating
+let lastHex = '';                // Prevent redundant DOM updates
+let sseRetryDelay = 1000;        // Exponential backoff start
+let sseSource = null;
+let isTabVisible = true;         // Save CPU when tab is hidden
 
 // ── Node Definitions ────────────────────────────────────────────
 const COLORS = {
@@ -48,13 +57,11 @@ const NODES = {
     alertSys: { x: 0.88, y: 0.82, icon: '⚠️', label: 'Alert System', color: COLORS.alert, type: 'sub' },
 };
 
-// Connections: publisher → broker, broker → subscribers
 const CONNECTIONS = [
     ['temperature', 'broker'], ['fire', 'broker'], ['door', 'broker'], ['light', 'broker'],
     ['broker', 'phone'], ['broker', 'dashboard'], ['broker', 'alertSys'],
 ];
 
-// Topic → publisher node mapping
 const TOPIC_NODE_MAP = {
     'home/fire': 'fire', 'home/temperature': 'temperature',
     'home/door': 'door', 'home/light': 'light', 'home/battery': 'temperature',
@@ -62,7 +69,7 @@ const TOPIC_NODE_MAP = {
 
 // ── Particle System ─────────────────────────────────────────────
 const particles = [];
-const nodeGlows = {};  // nodeKey → { intensity, color, decayRate }
+const nodeGlows = {};
 
 class Particle {
     constructor(fromKey, toKey, color, priority) {
@@ -93,8 +100,12 @@ class Particle {
     getPos(w, h) {
         const f = NODES[this.fromKey];
         const t = NODES[this.toKey];
-        const fx = f.x * w, fy = f.y * h;
-        const tx = t.x * w, ty = t.y * h;
+        // Calculate floating offsets for accurate tracking
+        const floatF = Math.sin(Date.now() / 800 + f.x * 10) * 4;
+        const floatT = Math.sin(Date.now() / 800 + t.x * 10) * 4;
+        
+        const fx = f.x * w, fy = f.y * h + floatF;
+        const tx = t.x * w, ty = t.y * h + floatT;
         const mx = (fx + tx) / 2;
         const my = (fy + ty) / 2 + (fy - ty) * 0.15;
         const p = this.progress;
@@ -106,7 +117,6 @@ class Particle {
     }
 
     draw(ctx, w, h) {
-        // Trail
         for (let i = 0; i < this.trail.length; i++) {
             const alpha = (i + 1) / this.trail.length * 0.5;
             const sz = this.size * (i + 1) / this.trail.length * 0.6;
@@ -115,13 +125,12 @@ class Particle {
             ctx.fillStyle = this.color + Math.round(alpha * 255).toString(16).padStart(2, '0');
             ctx.fill();
         }
-        // Main dot
         const pos = this.getPos(w, h);
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, this.size, 0, Math.PI * 2);
         ctx.fillStyle = this.color;
         ctx.fill();
-        // Glow
+        
         ctx.beginPath();
         ctx.arc(pos.x, pos.y, this.size * 3, 0, Math.PI * 2);
         const grd = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, this.size * 3);
@@ -133,21 +142,20 @@ class Particle {
 }
 
 function spawnMessage(topic, priority, payload) {
+    if (!isTabVisible || particles.length > MAX_PARTICLES) return;
+
     const pubKey = TOPIC_NODE_MAP[topic] || 'temperature';
     const color = NODES[pubKey]?.color || '#6366f1';
 
-    // Glow the publisher node
     nodeGlows[pubKey] = { intensity: 1, color: color, decay: 0.02 };
 
-    // Step 1: publisher → broker
     const p1 = new Particle(pubKey, 'broker', color, priority);
     p1.onArrive = () => {
-        // Glow the broker
         nodeGlows['broker'] = { intensity: 1, color: color, decay: 0.025 };
-        // Step 2: broker → all subscribers (fan-out)
         const subs = ['phone', 'dashboard', 'alertSys'];
         subs.forEach((sub, i) => {
             setTimeout(() => {
+                if (!isTabVisible || particles.length > MAX_PARTICLES) return;
                 const p2 = new Particle('broker', sub, color, priority);
                 p2.onArrive = () => {
                     nodeGlows[sub] = { intensity: 1, color: color, decay: 0.03 };
@@ -182,11 +190,17 @@ function drawTopology() {
     for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
     for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
 
+    const time = Date.now() / 800; // For floating animation
+
     // Draw connections
     CONNECTIONS.forEach(([fromKey, toKey]) => {
         const f = NODES[fromKey], t = NODES[toKey];
-        const fx = f.x * w, fy = f.y * h;
-        const tx = t.x * w, ty = t.y * h;
+        // Apply float offsets
+        const floatF = Math.sin(time + f.x * 10) * 4;
+        const floatT = Math.sin(time + t.x * 10) * 4;
+
+        const fx = f.x * w, fy = f.y * h + floatF;
+        const tx = t.x * w, ty = t.y * h + floatT;
         const mx = (fx + tx) / 2;
         const my = (fy + ty) / 2 + (fy - ty) * 0.15;
 
@@ -197,7 +211,6 @@ function drawTopology() {
         ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // "TCP" label at midpoint
         const lx = fx * 0.45 + tx * 0.55;
         const ly = fy * 0.45 + ty * 0.55 + (fy - ty) * 0.06;
         ctx.font = '9px "JetBrains Mono", monospace';
@@ -206,7 +219,6 @@ function drawTopology() {
         ctx.fillText('TCP', lx, ly);
     });
 
-    // Draw section labels
     ctx.font = '600 10px Inter, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
@@ -214,21 +226,21 @@ function drawTopology() {
     ctx.fillText('BROKER', 0.46 * w, h - 10);
     ctx.fillText('SUBSCRIBERS', 0.88 * w, h - 10);
 
-    // Draw particles
     for (let i = particles.length - 1; i >= 0; i--) {
         particles[i].update(w, h);
         if (!particles[i].alive) { particles.splice(i, 1); continue; }
         particles[i].draw(ctx, w, h);
     }
 
-    // Draw nodes
     Object.entries(NODES).forEach(([key, node]) => {
-        const nx = node.x * w, ny = node.y * h;
+        // Floating effect
+        const floatOffset = Math.sin(time + node.x * 10) * 4;
+        const nx = node.x * w, ny = node.y * h + floatOffset;
+        
         const glow = nodeGlows[key];
         const isBroker = node.type === 'broker';
         const radius = isBroker ? 38 : 24;
 
-        // Glow ring
         if (glow && glow.intensity > 0.05) {
             ctx.beginPath();
             ctx.arc(nx, ny, radius + 12, 0, Math.PI * 2);
@@ -240,7 +252,6 @@ function drawTopology() {
             glow.intensity -= glow.decay;
         }
 
-        // Node circle
         ctx.beginPath();
         ctx.arc(nx, ny, radius, 0, Math.PI * 2);
         ctx.fillStyle = isBroker ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)';
@@ -249,13 +260,11 @@ function drawTopology() {
         ctx.lineWidth = isBroker ? 2 : 1.5;
         ctx.stroke();
 
-        // Icon
         ctx.font = isBroker ? '22px sans-serif' : '18px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(node.icon, nx, ny - (isBroker ? 4 : 0));
 
-        // Label
         ctx.font = '600 11px Inter, sans-serif';
         ctx.fillStyle = '#e2e8f0';
         ctx.textBaseline = 'top';
@@ -267,7 +276,6 @@ function drawTopology() {
             ctx.fillText(node.sublabel, nx, ny + radius + 22);
         }
 
-        // Broker internal stages
         if (isBroker) {
             ctx.font = '500 8px "JetBrains Mono", monospace';
             ctx.fillStyle = 'rgba(255,255,255,0.25)';
@@ -309,7 +317,7 @@ function drawChart() {
     ctx.lineTo(w, h);
     ctx.lineTo(0, h);
     const grad = ctx.createLinearGradient(0, 0, 0, h);
-    grad.addColorStop(0, 'rgba(129,140,248,0.25)');
+    grad.addColorStop(0, 'rgba(129,140,248,0.3)');
     grad.addColorStop(1, 'rgba(129,140,248,0.0)');
     ctx.fillStyle = grad;
     ctx.fill();
@@ -330,7 +338,6 @@ function addToQueue(topic, priority, payload) {
     if (queueUpdateTimer) return;
     queueUpdateTimer = setTimeout(() => {
         queueUpdateTimer = null;
-        // Sort by priority (highest first) for display
         const sorted = [...queueItems].sort((a, b) => b.priority - a.priority);
 
         queueFeed.innerHTML = sorted.map(item => `
@@ -340,7 +347,7 @@ function addToQueue(topic, priority, payload) {
                 <span class="q-topic">${item.topic}</span>
             </div>
         `).join('');
-    }, 50);
+    }, 100); // Throttled slightly to prevent DOM churn
 }
 
 // ── Message Feed ────────────────────────────────────────────────
@@ -362,7 +369,7 @@ function addFeedMessage(topic, priority, payload, timestamp, isHistory) {
         <span class="feed-time">${time}</span>
     `;
     messageFeed.insertBefore(el, messageFeed.firstChild);
-    while (messageFeed.children.length > 100) messageFeed.removeChild(messageFeed.lastChild);
+    while (messageFeed.children.length > MAX_FEED_ITEMS) messageFeed.removeChild(messageFeed.lastChild);
 
     totalMessages++;
     msgCountEl.textContent = totalMessages;
@@ -377,7 +384,9 @@ function escapeHtml(text) {
 
 // ── Protocol Inspector ──────────────────────────────────────────
 function updateInspector(hex, topic, priority, payload) {
-    // Format hex with spaces
+    if (hex === lastHex) return; // Prevent unnecessary DOM updates
+    lastHex = hex;
+
     const formatted = hex.match(/.{1,2}/g)?.join(' ') || hex;
     hexDisplay.textContent = formatted.toUpperCase();
 
@@ -385,7 +394,6 @@ function updateInspector(hex, topic, priority, payload) {
     const topicHex = hex.substring(2, 10).toUpperCase();
     const priByte = hex.substring(10, 12).toUpperCase();
     const lenHex = hex.substring(12, 20).toUpperCase();
-    const payloadHex = hex.substring(20).toUpperCase();
 
     const cmdNames = { '01': 'SUBSCRIBE', '02': 'PUBLISH', '03': 'TIME_TRAVEL' };
 
@@ -401,9 +409,12 @@ function updateInspector(hex, topic, priority, payload) {
 
 // ── SSE Connection ──────────────────────────────────────────────
 function connectSSE() {
+    if (sseSource) sseSource.close();
     const src = new EventSource('/stream');
+    sseSource = src;
 
     src.onopen = () => {
+        sseRetryDelay = 1000; // Reset backoff on success
         statusDot.className = 'status-dot connected';
         statusText.textContent = 'Dashboard Server Connected';
     };
@@ -441,16 +452,13 @@ function connectSSE() {
                 const ts = data.timestamp || Date.now() / 1000;
                 const isHistory = data.history === true;
 
-                // Animate particles only for live messages to prevent browser freeze
                 if (!isHistory) {
                     spawnMessage(topic, pri, payload);
                     addToQueue(topic, pri, payload);
                 }
 
-                // Update UI log feed
                 addFeedMessage(topic, pri, payload, ts, isHistory);
 
-                // Update protocol inspector
                 if (data.hex && !isHistory) {
                     updateInspector(data.hex, topic, pri, payload);
                 }
@@ -470,7 +478,10 @@ function connectSSE() {
         statusDot.className = 'status-dot disconnected';
         statusText.textContent = 'Disconnected — Retrying…';
         src.close();
-        setTimeout(connectSSE, 2000);
+        
+        // Exponential backoff strategy
+        setTimeout(connectSSE, sseRetryDelay);
+        sseRetryDelay = Math.min(sseRetryDelay * 1.5, 10000);
     };
 }
 
@@ -511,8 +522,8 @@ document.getElementById('btnReplay').addEventListener('click', async () => {
             body: JSON.stringify({ offset }),
         });
     } catch (err) { console.error('Time travel error:', err); }
-    // Button reset is handled by the 'time_travel_done' SSE event
-    // Fallback timeout in case the event doesn't arrive
+    
+    // Safety fallback reset
     setTimeout(() => {
         btn.disabled = false;
         if (btn.textContent === '⏳ Replaying…') {
@@ -539,11 +550,14 @@ setInterval(() => {
 
 // ── Animation Loop ──────────────────────────────────────────────
 function animate() {
-    drawTopology();
+    if (isTabVisible) {
+        drawTopology();
+    }
     requestAnimationFrame(animate);
 }
 
-// ── Init ────────────────────────────────────────────────────────
+// ── Init & Listeners ────────────────────────────────────────────
+let resizeTimer;
 function init() {
     resizeTopology();
     resizeChart();
@@ -552,5 +566,19 @@ function init() {
     animate();
 }
 
-window.addEventListener('resize', () => { resizeTopology(); resizeChart(); drawChart(); });
+// Debounced resize to prevent canvas flicker
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { 
+        resizeTopology(); 
+        resizeChart(); 
+        drawChart(); 
+    }, 200);
+});
+
+// Pause rendering and particles when user switches tabs
+document.addEventListener('visibilitychange', () => {
+    isTabVisible = !document.hidden;
+});
+
 window.addEventListener('load', init);
