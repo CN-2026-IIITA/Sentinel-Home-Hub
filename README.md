@@ -1,8 +1,8 @@
-# 🏠 Smart Home Hub — Pub/Sub Message Broker
+#  Smart Home Hub — Pub/Sub Message Broker
 
 A **zero-dependency**, high-performance Publish/Subscribe message broker for IoT smart home devices, built entirely on Python's standard library.
 
-> *"The brain of a smart home — routes critical alerts first, remembers every event forever, and lets you time-travel to any moment in history."*
+> "The brain of a smart home — routes critical alerts first, remembers every event forever, and lets you time-travel to any moment in history."
 
 ---
 
@@ -51,7 +51,7 @@ A **zero-dependency**, high-performance Publish/Subscribe message broker for IoT
 
 ---
 
-## 📊 System Diagrams (Mermaid)
+##  System Diagrams (Mermaid)
 
 The following diagrams provide a visual breakdown of the Sentinel Home Hub's internal workings, connections, and lifecycle. These will automatically render on GitHub.
 
@@ -265,7 +265,7 @@ python smart_home_simulator.py
 You should see:
 
 ```
-🏠 Smart Home IoT Device Simulator
+ Smart Home IoT Device Simulator
 Devices:
   🌡️  Temperature Sensor  (every 2s,   priority 50)
   🔥  Fire Alarm          (every 30s,  priority 10/255)
@@ -284,7 +284,7 @@ Devices:
 
 ## Interactive Demo Features
 
-### 🔧 Device Control Buttons
+###  Device Control Buttons
 
 Click buttons in the **Simulate Devices** panel to manually trigger IoT events:
 
@@ -298,7 +298,7 @@ Click buttons in the **Simulate Devices** panel to manually trigger IoT events:
 
 When you click a button, watch the **animated particle** travel from the device node → broker → all subscribers.
 
-### 📦 Protocol Inspector
+###  Protocol Inspector
 
 The bottom-left panel shows the **raw binary protocol** of the last message:
 
@@ -315,7 +315,7 @@ PAYLOAD "🔥 FIRE DETECTED in sector 7G!"
 TOTAL   42 bytes (JSON: ~80 bytes → 48% smaller)
 ```
 
-### ⏪ Time-Travel Replay
+###  Time-Travel Replay
 
 Time-Travel lets you **replay historical messages** from the binary event log.
 
@@ -488,6 +488,3 @@ This creates a **per-browser-tab TCP connection** to the broker — each tab can
 | **Web** | HTTP Server | Hand-written (no Flask/Django) |
 | **Web** | Server-Sent Events | Real-time push to browser dashboard |
 | **Web** | Proxy Pattern | Dashboard bridges browser ↔ broker |
-#   S e n t i n e l - H o m e - H u b 
- 
- 
