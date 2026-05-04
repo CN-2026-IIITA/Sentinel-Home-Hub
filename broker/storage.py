@@ -23,6 +23,9 @@ from broker.protocol import HEADER_SIZE, decode_header
 
 log = logging.getLogger(__name__)
 
+DEFAULT_LOG_PATH = "broker_log.bin"
+REPLAY_BATCH_SIZE = 50
+
 
 class EventLog:
     """
@@ -32,7 +35,7 @@ class EventLog:
     so the event loop is never blocked.
     """
 
-    def __init__(self, path: str = "broker_log.bin") -> None:
+    def __init__(self, path: str = DEFAULT_LOG_PATH) -> None:
         self._path = path
         # Ensure the file exists
         if not os.path.exists(path):
@@ -86,7 +89,11 @@ class EventLog:
         to the thread pool for efficiency.
         """
         while True:
-            results = await asyncio.to_thread(self._sync_read_batch, offset, 50)
+            results = await asyncio.to_thread(
+                self._sync_read_batch,
+                offset,
+                REPLAY_BATCH_SIZE,
+            )
             if not results:
                 break
             for frame, next_offset in results:

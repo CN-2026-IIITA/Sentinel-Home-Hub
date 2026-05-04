@@ -25,6 +25,8 @@ log = logging.getLogger(__name__)
 __all__ = ["PriorityRouter"]
 
 HeapEntry = tuple[int, int, Message]
+VISUALIZATION_DELAY_SECONDS = 0.05
+ERROR_BACKOFF_SECONDS = 1
 
 
 class PriorityRouter:
@@ -105,15 +107,20 @@ class PriorityRouter:
                 self._event.clear()
 
                 while self._heap:
-                    neg_pri, _seq, msg = heapq.heappop(self._heap)
+                    msg = self._pop_next_message()
                     await self._fanout(msg)
-                    
+
                     # Tiny artificial delay to visualize QoS priority sorting 
                     # and prevent overwhelming the frontend visualization
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(VISUALIZATION_DELAY_SECONDS)
             except Exception as e:
                 log.error(f"Router worker crashed: {e}", exc_info=True)
-                await asyncio.sleep(1)  # prevent tight error loop
+                await asyncio.sleep(ERROR_BACKOFF_SECONDS)  # prevent tight error loop
+
+    def _pop_next_message(self) -> Message:
+        """Pop the next queued message according to priority and FIFO order."""
+        _neg_pri, _seq, msg = heapq.heappop(self._heap)
+        return msg
 
     async def _fanout(self, msg: Message) -> None:
         """
