@@ -11,7 +11,8 @@ Bridges the browser visualization to the Pub/Sub broker.
 Usage::
     python dashboard_server.py
 """
-
+# Acts as an HTTP proxy/bridge. It connects to the TCP broker as a client, translates the binary data into Server-Sent Events (SSE), and serves the dashboard to a web browser
+# It decouples the heavy web/HTTP processing from the lightning-fast TCP broker. It allows browsers (which don't speak raw TCP binary) to visualize the system in real-time.
 import asyncio
 import json
 import logging

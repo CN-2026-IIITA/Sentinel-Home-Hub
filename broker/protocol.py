@@ -11,7 +11,8 @@ Packet Layout (10-byte fixed header + variable payload):
     Bytes 6-9    : Payload Length  (uint32)
     Bytes 10+    : Payload        (raw bytes)
 """
-
+# Role: Defines the custom 10-byte binary wire protocol. Uses Python's struct module to pack and unpack raw bytes.
+# Importance: This is what makes your broker faster than JSON-based systems. It guarantees that messages have exactly the right format, eliminating parsing latency and reducing bandwidth.
 from __future__ import annotations
 
 import asyncio

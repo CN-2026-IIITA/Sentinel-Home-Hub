@@ -11,6 +11,9 @@ Responsibilities
   router (Phase 3) or storage layer (Phase 4).
 * Handle disconnects gracefully without crashing the event loop.
 """
+#Role: Manages all incoming TCP connections using asyncio. It handles client connections, reads raw byte streams, and gracefully manages sudden client drop-offs.
+#Importance: This enables the server to handle thousands of concurrent connections efficiently on a single thread. It protects the broker from crashing if a client disconnects unexpectedly.
+# asyncio is the backbone of the server's concurrency model, allowing it to serve many clients simultaneously without blocking. The ConnectionRegistry keeps track of active clients and their subscriptions, while the BrokerServer orchestrates the overall flow of messages through the system.
 
 from __future__ import annotations
 
