@@ -1,5 +1,5 @@
 """
-Phase 1: Asynchronous Core (Network Layer)
+Asynchronous Core (Network Layer)
 ============================================
 High-concurrency TCP server using ``asyncio.start_server``.
 

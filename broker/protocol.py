@@ -1,5 +1,5 @@
 """
-Phase 2: Custom Binary Protocol (Codec Layer)
+Custom Binary Protocol (Codec Layer)
 ==============================================
 All network messages are serialized into a compact binary format
 using the ``struct`` module, avoiding JSON overhead entirely.
@@ -14,6 +14,7 @@ Packet Layout (10-byte fixed header + variable payload):
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import struct
 from typing import NamedTuple
@@ -51,7 +52,7 @@ def topic_hash(topic: str) -> int:
     Collisions are possible (~50 % at ~77 K topics) but acceptable
     for this broker's scope.
     """
-    digest = hashlib.md5(topic.encode()).digest()
+    digest = hashlib.md5(topic.encode("utf-8")).digest()
     return struct.unpack("!I", digest[:4])[0]
 
 
@@ -92,7 +93,7 @@ def decode_header(data: bytes) -> tuple[int, int, int, int]:
     return struct.unpack(HEADER_FORMAT, data[:HEADER_SIZE])
 
 
-async def read_message(reader) -> Message | None:
+async def read_message(reader: asyncio.StreamReader) -> Message | None:
     """
     Read one complete message from an ``asyncio.StreamReader``.
 
