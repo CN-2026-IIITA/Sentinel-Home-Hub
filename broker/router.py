@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
+__all__ = ["PriorityRouter"]
+
 
 class PriorityRouter:
     """
@@ -76,6 +78,16 @@ class PriorityRouter:
         self._seq += 1
         heapq.heappush(self._heap, entry)
         self._event.set()                       # wake up the worker
+
+    @property
+    def is_running(self) -> bool:
+        """Return ``True`` when the background router worker is active."""
+        return self._running
+
+    @property
+    def pending_count(self) -> int:
+        """Return the number of messages waiting in the priority queue."""
+        return len(self._heap)
 
     # ── internal worker ───────────────────────────────────────────
 
