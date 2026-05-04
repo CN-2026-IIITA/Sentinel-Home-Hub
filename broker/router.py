@@ -22,13 +22,6 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-__all__ = ["PriorityRouter"]
-
-HeapEntry = tuple[int, int, Message]
-VISUALIZATION_DELAY_SECONDS = 0.05
-ERROR_BACKOFF_SECONDS = 1
-CLIENT_DRAIN_TIMEOUT_SECONDS = 5.0
-
 
 class PriorityRouter:
     """
@@ -44,7 +37,7 @@ class PriorityRouter:
             The live connection registry used to look up subscribers.
         """
         self._registry = registry
-        self._heap: list[HeapEntry] = []
+        self._heap: list[tuple[int, int, Message]] = []
         self._seq: int = 0                      # monotonic tie-breaker
         self._event = asyncio.Event()            # signals the worker
         self._running: bool = False
@@ -84,16 +77,6 @@ class PriorityRouter:
         heapq.heappush(self._heap, entry)
         self._event.set()                       # wake up the worker
 
-    @property
-    def is_running(self) -> bool:
-        """Return ``True`` when the background router worker is active."""
-        return self._running
-
-    @property
-    def pending_count(self) -> int:
-        """Return the number of messages waiting in the priority queue."""
-        return len(self._heap)
-
     # ── internal worker ───────────────────────────────────────────
 
     async def _worker(self) -> None:
@@ -108,20 +91,15 @@ class PriorityRouter:
                 self._event.clear()
 
                 while self._heap:
-                    msg = self._pop_next_message()
+                    neg_pri, _seq, msg = heapq.heappop(self._heap)
                     await self._fanout(msg)
-
+                    
                     # Tiny artificial delay to visualize QoS priority sorting 
                     # and prevent overwhelming the frontend visualization
-                    await asyncio.sleep(VISUALIZATION_DELAY_SECONDS)
+                    await asyncio.sleep(0.05)
             except Exception as e:
                 log.error(f"Router worker crashed: {e}", exc_info=True)
-                await asyncio.sleep(ERROR_BACKOFF_SECONDS)  # prevent tight error loop
-
-    def _pop_next_message(self) -> Message:
-        """Pop the next queued message according to priority and FIFO order."""
-        _neg_pri, _seq, msg = heapq.heappop(self._heap)
-        return msg
+                await asyncio.sleep(1)  # prevent tight error loop
 
     async def _fanout(self, msg: Message) -> None:
         """
@@ -139,10 +117,7 @@ class PriorityRouter:
         for client_id, writer in subscribers:
             try:
                 writer.write(frame)
-                await asyncio.wait_for(
-                    writer.drain(),
-                    timeout=CLIENT_DRAIN_TIMEOUT_SECONDS,
-                )
+                await asyncio.wait_for(writer.drain(), timeout=5.0)
             except (ConnectionResetError, ConnectionAbortedError,
                     BrokenPipeError, OSError, asyncio.TimeoutError) as exc:
                 log.warning("Client %s unreachable (%s) — unregistering", client_id, exc)
