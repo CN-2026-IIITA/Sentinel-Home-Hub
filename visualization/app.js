@@ -32,9 +32,9 @@ let maxThroughput = 50;
 
 // ── Node Definitions ────────────────────────────────────────────
 const COLORS = {
-    fire: '#ef4444', temperature: '#22d3ee', door: '#fbbf24',
-    light: '#a78bfa', battery: '#34d399', broker: '#818cf8',
-    phone: '#34d399', dashboard: '#38bdf8', alert: '#fb923c',
+    fire: '#f43f5e', temperature: '#06b6d4', door: '#f59e0b',
+    light: '#a855f7', battery: '#10b981', broker: '#6366f1',
+    phone: '#10b981', dashboard: '#0ea5e9', alert: '#f97316',
 };
 
 const NODES = {
@@ -134,7 +134,7 @@ class Particle {
 
 function spawnMessage(topic, priority, payload) {
     const pubKey = TOPIC_NODE_MAP[topic] || 'temperature';
-    const color = NODES[pubKey]?.color || '#818cf8';
+    const color = NODES[pubKey]?.color || '#6366f1';
 
     // Glow the publisher node
     nodeGlows[pubKey] = { intensity: 1, color: color, decay: 0.02 };
@@ -302,7 +302,7 @@ function drawChart() {
         const y = h - (throughputHistory[i] / maxThroughput) * h * 0.9;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
-    ctx.strokeStyle = '#818cf8';
+    ctx.strokeStyle = '#6366f1';
     ctx.lineWidth = 2;
     ctx.stroke();
 
@@ -317,8 +317,8 @@ function drawChart() {
 
 // ── Priority Queue Display ──────────────────────────────────────
 const queueItems = [];
-const colors = { critical: '#ef4444', high: '#fbbf24', medium: '#818cf8', low: '#34d399' };
-const bgs = { critical: 'rgba(239,68,68,0.1)', high: 'rgba(251,191,36,0.1)', medium: 'rgba(129,140,248,0.08)', low: 'rgba(52,211,153,0.08)' };
+const colors = { critical: '#f43f5e', high: '#f59e0b', medium: '#6366f1', low: '#10b981' };
+const bgs = { critical: 'rgba(244,63,94,0.1)', high: 'rgba(245,158,11,0.1)', medium: 'rgba(99,102,241,0.08)', low: 'rgba(16,185,129,0.08)' };
 let queueUpdateTimer = null;
 
 function addToQueue(topic, priority, payload) {
