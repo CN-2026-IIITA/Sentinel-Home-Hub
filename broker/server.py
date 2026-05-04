@@ -1,19 +1,15 @@
 """
 Asynchronous Core (Network Layer)
-============================================
-High-concurrency TCP server using ``asyncio.start_server``.
+=================================
+High-concurrency TCP server using asyncio.start_server.
 
 Responsibilities
 ----------------
 * Accept incoming TCP connections.
 * Maintain a live registry of subscribers per topic.
-* Decode incoming binary frames (Phase 2) and dispatch to the
-  router (Phase 3) or storage layer (Phase 4).
+* Decode incoming binary frames and dispatch to router/storage.
 * Handle disconnects gracefully without crashing the event loop.
 """
-#Role: Manages all incoming TCP connections using asyncio. It handles client connections, reads raw byte streams, and gracefully manages sudden client drop-offs.
-#Importance: This enables the server to handle thousands of concurrent connections efficiently on a single thread. It protects the broker from crashing if a client disconnects unexpectedly.
-# asyncio is the backbone of the server's concurrency model, allowing it to serve many clients simultaneously without blocking. The ConnectionRegistry keeps track of active clients and their subscriptions, while the BrokerServer orchestrates the overall flow of messages through the system.
 
 from __future__ import annotations
 
@@ -38,6 +34,10 @@ from broker.storage import EventLog
 
 log = logging.getLogger(__name__)
 
+# Safety limits (prevents malicious or accidental huge payloads)
+MAX_PAYLOAD_BYTES = 5 * 1024 * 1024  # 5 MB
+TIME_TRAVEL_OFFSET_BYTES = 8         # uint64 size
+
 
 # ═════════════════════════════════════════════════════════════════
 # Connection Registry
@@ -45,15 +45,14 @@ log = logging.getLogger(__name__)
 
 class ConnectionRegistry:
     """
-    Thread-safe (single-threaded asyncio) registry mapping
-    client IDs → (reader, writer, subscribed_topics).
+    Registry mapping client IDs -> (reader, writer, subscribed_topics).
+    Used by the router to fan-out messages to active subscribers.
     """
 
     def __init__(self) -> None:
-        # client_id → (reader, writer, set[topic_id])
         self._clients: dict[str, tuple[asyncio.StreamReader,
-                                        asyncio.StreamWriter,
-                                        set[int]]] = {}
+                                       asyncio.StreamWriter,
+                                       set[int]]] = {}
 
     async def register(
         self,
@@ -82,15 +81,14 @@ class ConnectionRegistry:
                      client_id, len(self._clients))
 
     def subscribe(self, client_id: str, topic_id: int) -> None:
-        """Add *topic_id* to a client's subscription set."""
+        """Add topic_id to the client's subscription set."""
         if client_id in self._clients:
             self._clients[client_id][2].add(topic_id)
             log.info("Client %s subscribed to topic %d", client_id, topic_id)
 
     def get_subscribers(self, topic_id: int) -> list[tuple[str, asyncio.StreamWriter]]:
         """
-        Return a list of ``(client_id, writer)`` tuples for every
-        client subscribed to *topic_id*.
+        Return (client_id, writer) for every client subscribed to topic_id.
         """
         result: list[tuple[str, asyncio.StreamWriter]] = []
         for cid, (_, writer, topics) in self._clients.items():
@@ -114,11 +112,11 @@ class BrokerServer:
     Parameters
     ----------
     host : str
-        Bind address (default ``127.0.0.1``).
+        Bind address (default 127.0.0.1)
     port : int
-        Bind port (default ``9999``).
+        Bind port (default 9999)
     log_path : str
-        Path for the binary event log (default ``broker_log.bin``).
+        Path for the binary event log (default broker_log.bin)
     """
 
     def __init__(
@@ -130,26 +128,30 @@ class BrokerServer:
         self.host = host
         self.port = port
 
-        # Layers
+        # Core layers
         self.registry = ConnectionRegistry()
         self.event_log = EventLog(path=log_path)
         self.router = PriorityRouter(registry=self.registry)
 
         self._server: Optional[asyncio.Server] = None
         self._shutdown_event = asyncio.Event()
+
+        # Metrics
         self.messages_processed = 0
         self.latest_offset = 0
         self._metrics_task: Optional[asyncio.Task] = None
 
-    # ── lifecycle ─────────────────────────────────────────────────
+    # ── lifecycle ────────────────────────────────────────────────
 
     async def start(self) -> None:
-        """Start the TCP server and the routing worker."""
+        """Start TCP server and routing worker."""
         self.router.start()
         self._metrics_task = asyncio.create_task(self._publish_metrics())
+
         self._server = await asyncio.start_server(
-            self._handle_client, self.host, self.port,
+            self._handle_client, self.host, self.port
         )
+
         addrs = ", ".join(str(s.getsockname()) for s in self._server.sockets)
         log.info("Broker listening on %s", addrs)
 
@@ -158,14 +160,17 @@ class BrokerServer:
 
     async def stop(self) -> None:
         """Initiate graceful shutdown."""
-        log.info("Broker shutting down …")
+        log.info("Broker shutting down…")
+        self._shutdown_event.set()
+
         if self._metrics_task:
             self._metrics_task.cancel()
-        await self.router.stop()
+
         if self._server is not None:
             self._server.close()
             await self._server.wait_closed()
-        self._shutdown_event.set()
+
+        await self.router.stop()
 
     async def _publish_metrics(self) -> None:
         """Background task to periodically publish broker metrics."""
@@ -173,20 +178,28 @@ class BrokerServer:
         try:
             while not self._shutdown_event.is_set():
                 await asyncio.sleep(1.0)
+
                 throughput = self.messages_processed
                 self.messages_processed = 0
-                
+
                 metrics_data = {
                     "throughput": throughput,
-                    "current_log_offset": self.latest_offset
+                    "current_log_offset": self.latest_offset,
+                    "active_clients": self.registry.count,
                 }
-                payload = json.dumps(metrics_data).encode('utf-8')
-                msg = Message(command=CMD_PUBLISH, topic_id=topic_id, priority=255, payload=payload)
+
+                payload = json.dumps(metrics_data).encode("utf-8")
+                msg = Message(
+                    command=CMD_PUBLISH,
+                    topic_id=topic_id,
+                    priority=255,
+                    payload=payload,
+                )
                 self.router.enqueue(msg)
         except asyncio.CancelledError:
             pass
 
-    # ── per-client handler ────────────────────────────────────────
+    # ── per-client handler ───────────────────────────────────────
 
     async def _handle_client(
         self,
@@ -194,10 +207,11 @@ class BrokerServer:
         writer: asyncio.StreamWriter,
     ) -> None:
         """
-        Handle a single client's lifetime.
-
-        Reads binary frames in a loop, dispatching each command to
-        the appropriate handler.  Gracefully cleans up on disconnect.
+        Handle a single client's lifetime:
+        1) Register connection
+        2) Read frames in a loop
+        3) Dispatch to correct handler
+        4) Cleanup on disconnect
         """
         client_id = uuid.uuid4().hex[:12]
         await self.registry.register(client_id, reader, writer)
@@ -205,6 +219,7 @@ class BrokerServer:
         try:
             while True:
                 try:
+                    # Read one full message (header + payload)
                     msg = await read_message(reader)
                 except asyncio.IncompleteReadError:
                     # Client disconnected mid-frame
@@ -213,7 +228,13 @@ class BrokerServer:
                 if msg is None:
                     break
 
+                # Basic payload validation (safety guard)
+                if len(msg.payload) > MAX_PAYLOAD_BYTES:
+                    log.warning("Payload too large from %s (%d bytes)", client_id, len(msg.payload))
+                    break
+
                 await self._dispatch(client_id, msg, writer)
+
         except (ConnectionResetError, ConnectionAbortedError,
                 BrokenPipeError, OSError) as exc:
             log.debug("Client %s connection error: %s", client_id, exc)
@@ -244,17 +265,23 @@ class BrokerServer:
 
     async def _handle_publish(self, msg: Message) -> None:
         """
-        1. Persist the message to the event log (write-ahead).
-        2. Enqueue it in the priority router for fan-out.
+        Publish flow:
+        1) Persist to event log (write-ahead)
+        2) Enqueue into priority router for fan-out
         """
         frame = encode(msg.command, msg.topic_id, msg.priority, msg.payload)
+
+        # Persist to disk (WAL)
         offset = await self.event_log.append(frame)
         self.latest_offset = offset + len(frame)
         self.messages_processed += 1
+
         log.info(
             "PUBLISH  topic=%d  pri=%d  len=%d  offset=%d",
             msg.topic_id, msg.priority, len(msg.payload), offset,
         )
+
+        # Route to subscribers
         self.router.enqueue(msg)
 
     async def _handle_time_travel(
@@ -265,11 +292,9 @@ class BrokerServer:
     ) -> None:
         """
         Replay historical messages from a byte offset.
-        The client receives all stored frames from the given offset
-        and is expected to close the connection when done.
+        Client receives stored frames from offset and is expected to close when done.
         """
-        # Payload contains the byte offset as a uint64 (big-endian)
-        if len(msg.payload) < 8:
+        if len(msg.payload) < TIME_TRAVEL_OFFSET_BYTES:
             log.warning("Time-travel payload too short from %s", client_id)
             return
 
@@ -277,7 +302,7 @@ class BrokerServer:
         log.info("TIME-TRAVEL  client=%s  topic=%d  from_offset=%d",
                  client_id, msg.topic_id, offset)
 
-        # Stream historical messages
+        # Stream historical frames to client
         count = 0
         try:
             async for frame in self.event_log.replay_from(offset):
