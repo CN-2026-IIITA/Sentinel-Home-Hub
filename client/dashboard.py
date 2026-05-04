@@ -42,6 +42,12 @@ log = logging.getLogger("dashboard")
 # Global config passed from CLI
 CONFIG = {"broker_host": "127.0.0.1", "broker_port": 9999}
 
+def _priority_label(pri: int) -> str:
+    if pri >= 200: return "critical"
+    elif pri >= 128: return "high"
+    elif pri >= 64: return "medium"
+    return "low"
+
 # ═════════════════════════════════════════════════════════════════
 # HTTP Server
 # ═════════════════════════════════════════════════════════════════
@@ -81,7 +87,16 @@ async def http_handler(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
         # Route
         if method == "GET" and path == "/":
             await serve_html(writer)
-        
+        elif method == "GET" and path == "/events":
+            topic = query.get("topic", ["default"])[0]
+            await serve_sse(reader, writer, topic)
+            return  # SSE keeps connection open
+        elif method == "POST" and path == "/api/publish":
+            content_len = int(headers.get("content-length", "0"))
+            body = b""
+            if content_len > 0:
+                body = await reader.readexactly(content_len)
+            await handle_publish(writer, body)
         else:
             await send_response(writer, 404, "text/plain", b"Not Found")
 
@@ -101,6 +116,91 @@ async def serve_html(writer: asyncio.StreamWriter) -> None:
         content = f.read()
     await send_response(writer, 200, "text/html; charset=utf-8", content)
 
+async def serve_sse(http_reader: asyncio.StreamReader, http_writer: asyncio.StreamWriter, topic: str) -> None:
+    """
+    Acts as a dynamic client: Opens a dedicated TCP connection to the broker,
+    subscribes to the requested topic, and streams messages to the browser.
+    """
+    header = (
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/event-stream\r\n"
+        "Cache-Control: no-cache\r\n"
+        "Connection: keep-alive\r\n"
+        "Access-Control-Allow-Origin: *\r\n\r\n"
+    )
+    http_writer.write(header.encode())
+    await http_writer.drain()
+
+    try:
+        # 1. Open dedicated connection to Broker
+        broker_r, broker_w = await asyncio.open_connection(CONFIG["broker_host"], CONFIG["broker_port"])
+        log.info(f"Web Client dynamically subscribed to topic: '{topic}'")
+
+        # 2. Send CMD_SUBSCRIBE
+        tid = topic_hash(topic)
+        broker_w.write(encode(CMD_SUBSCRIBE, tid, 0))
+        await broker_w.drain()
+
+        msg_count = 0
+
+        # 3. Stream messages from Broker directly to Browser
+        while True:
+            try:
+                header_bytes = await broker_r.readexactly(HEADER_SIZE)
+            except asyncio.IncompleteReadError:
+                break
+
+            cmd, msg_tid, pri, plen = decode_header(header_bytes)
+            payload = await broker_r.readexactly(plen) if plen else b""
+            
+            msg_count += 1
+            event = {
+                "id": msg_count,
+                "topic_id": msg_tid,
+                "priority": pri,
+                "payload": payload.decode(errors="replace"),
+                "timestamp": time.time(),
+                "priority_label": _priority_label(pri),
+            }
+            
+            data = f"data: {json.dumps(event)}\n\n"
+            http_writer.write(data.encode())
+            await http_writer.drain()
+
+    except (ConnectionResetError, BrokenPipeError, OSError, asyncio.CancelledError):
+        log.info(f"Web Client disconnected from topic: '{topic}'")
+    finally:
+        try:
+            broker_w.close()
+            await broker_w.wait_closed()
+        except Exception:
+            pass
+
+async def handle_publish(writer: asyncio.StreamWriter, body: bytes) -> None:
+    """Opens a quick TCP connection to publish a message, then closes it."""
+    try:
+        data = json.loads(body)
+        topic = data.get("topic", "default")
+        priority = int(data.get("priority", 128))
+        message = data.get("message", "")
+
+        # Quick connection to broker
+        broker_r, broker_w = await asyncio.open_connection(CONFIG["broker_host"], CONFIG["broker_port"])
+        
+        tid = topic_hash(topic)
+        frame = encode(CMD_PUBLISH, tid, priority, message.encode())
+        broker_w.write(frame)
+        await broker_w.drain()
+        
+        broker_w.close()
+        await broker_w.wait_closed()
+
+        resp = json.dumps({"ok": True, "topic_id": tid}).encode()
+        await send_response(writer, 200, "application/json", resp)
+
+    except Exception as exc:
+        err = json.dumps({"error": str(exc)}).encode()
+        await send_response(writer, 400, "application/json", err)
 
 async def send_response(writer: asyncio.StreamWriter, status: int, content_type: str, body: bytes) -> None:
     status_text = {200: "OK", 400: "Bad Request", 404: "Not Found"}

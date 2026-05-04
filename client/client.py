@@ -86,6 +86,66 @@ async def mode_subscribe(host: str, port: int, topic: str) -> None:
     await writer.wait_closed()
 
 
+async def mode_publish(host: str, port: int, topic: str, priority: int, message: str) -> None:
+    """Publish a single message and disconnect."""
+    tid = topic_hash(topic)
+    reader, writer = await asyncio.open_connection(host, port)
+    log.info("Connected — publishing to '%s' (topic_id=%d, pri=%d)", topic, tid, priority)
+
+    frame = encode(CMD_PUBLISH, tid, priority, message.encode())
+    writer.write(frame)
+    await writer.drain()
+
+    log.info("Message sent ✔")
+    writer.close()
+    await writer.wait_closed()
+
+
+async def mode_publish_interactive(host: str, port: int, topic: str, priority: int) -> None:
+    """Interactively publish messages from stdin."""
+    tid = topic_hash(topic)
+    reader, writer = await asyncio.open_connection(host, port)
+    log.info("Connected — interactive publish mode on '%s' (topic_id=%d)", topic, tid)
+    log.info("Type messages and press Enter.  Ctrl+C to quit.\n")
+
+    try:
+        loop = asyncio.get_running_loop()
+        while True:
+            line = await loop.run_in_executor(None, sys.stdin.readline)
+            if not line:
+                break
+            text = line.strip()
+            if not text:
+                continue
+            frame = encode(CMD_PUBLISH, tid, priority, text.encode())
+            writer.write(frame)
+            await writer.drain()
+            log.info("Sent ✔  %r", text)
+    except (KeyboardInterrupt, EOFError):
+        pass
+    finally:
+        writer.close()
+        await writer.wait_closed()
+
+
+async def mode_time_travel(host: str, port: int, topic: str, offset: int) -> None:
+    """
+    Send a time-travel subscribe command, receive historical
+    messages, then listen for real-time messages.
+    """
+    tid = topic_hash(topic)
+    reader, writer = await asyncio.open_connection(host, port)
+    log.info("Connected — time-travel on '%s' from offset %d", topic, offset)
+
+    payload = struct.pack("!Q", offset)
+    frame = encode(CMD_TIME_TRAVEL, tid, 0, payload)
+    writer.write(frame)
+    await writer.drain()
+
+    await _listen(reader)
+    writer.close()
+    await writer.wait_closed()
+
 
 # ═════════════════════════════════════════════════════════════════
 # CLI
@@ -101,7 +161,21 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("subscribe", help="Subscribe to a topic")
     s.add_argument("--topic", required=True)
 
-   
+    # publish (single message)
+    s = sub.add_parser("publish", help="Publish a single message")
+    s.add_argument("--topic", required=True)
+    s.add_argument("--priority", type=int, default=128)
+    s.add_argument("--message", required=True)
+
+    # publish-interactive
+    s = sub.add_parser("publish-interactive", help="Publish messages interactively from stdin")
+    s.add_argument("--topic", required=True)
+    s.add_argument("--priority", type=int, default=128)
+
+    # time-travel
+    s = sub.add_parser("time-travel", help="Replay from a log offset, then go live")
+    s.add_argument("--topic", required=True)
+    s.add_argument("--offset", type=int, default=0)
 
     return p
 
@@ -111,7 +185,12 @@ def main() -> None:
     try:
         if args.mode == "subscribe":
             asyncio.run(mode_subscribe(args.host, args.port, args.topic))
-        
+        elif args.mode == "publish":
+            asyncio.run(mode_publish(args.host, args.port, args.topic, args.priority, args.message))
+        elif args.mode == "publish-interactive":
+            asyncio.run(mode_publish_interactive(args.host, args.port, args.topic, args.priority))
+        elif args.mode == "time-travel":
+            asyncio.run(mode_time_travel(args.host, args.port, args.topic, args.offset))
     except KeyboardInterrupt:
         log.info("Interrupted")
 
