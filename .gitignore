@@ -20,6 +20,9 @@ env/
 *.out
 bin/
 
+build/
+*.exe
+
 # IDE specific files
 .vscode/
 .idea/
