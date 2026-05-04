@@ -65,7 +65,7 @@ DEVICE_CONFIGS = {
 }
 
 import random
-#1
+
 async def _read_one(reader: asyncio.StreamReader):
     try:
         header = await reader.readexactly(HEADER_SIZE)
@@ -154,6 +154,73 @@ async def broadcast_sse(data: dict):
             pass  # should not happen after the drain above
 
 
+async def simulate_device(device: str):
+    """Publishes a simulated IoT device message to the broker."""
+    config = DEVICE_CONFIGS.get(device)
+    if not config:
+        return False
+
+    try:
+        reader, writer = await asyncio.open_connection(BROKER_HOST, BROKER_PORT)
+        tid = topic_hash(config["topic"])
+        payload_str = config["payload"]
+
+        # Add randomness to temperature
+        if device == "temperature":
+            payload_str = config["payload"] % (20.0 + random.random() * 25.0)
+
+        frame = encode(CMD_PUBLISH, tid, config["priority"], payload_str.encode())
+        writer.write(frame)
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+        log.info(f"Simulated {device}: {payload_str}")
+        return True
+    except Exception as e:
+        log.error(f"Simulate {device} error: {e}")
+        return False
+
+
+async def simulate_burst():
+    """Simulates a QoS burst: 50 fire alarms + 200 battery updates over a single connection."""
+    try:
+        reader, writer = await asyncio.open_connection(BROKER_HOST, BROKER_PORT)
+
+        # Build all messages: interleave high-priority fire with low-priority battery
+        messages = []
+        # Send 5 fire alarms
+        for _ in range(5):
+            cfg = DEVICE_CONFIGS["fire"]
+            messages.append((cfg["topic"], cfg["priority"], cfg["payload"]))
+        # Followed by 20 battery updates
+        for _ in range(20):
+            cfg = DEVICE_CONFIGS["battery"]
+            messages.append((cfg["topic"], cfg["priority"], cfg["payload"]))
+        # Followed by 5 more fire alarms
+        for _ in range(5):
+            cfg = DEVICE_CONFIGS["fire"]
+            messages.append((cfg["topic"], cfg["priority"], cfg["payload"]))
+        # Followed by 20 more battery updates
+        for _ in range(20):
+            cfg = DEVICE_CONFIGS["battery"]
+            messages.append((cfg["topic"], cfg["priority"], cfg["payload"]))
+
+        # Send all frames through one connection
+        for topic_str, pri, payload_str in messages:
+            tid = topic_hash(topic_str)
+            frame = encode(CMD_PUBLISH, tid, pri, payload_str.encode())
+            writer.write(frame)
+
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+        log.info(f"Burst sent {len(messages)} messages over single connection")
+        return True
+    except Exception as e:
+        log.error(f"Burst error: {e}")
+        return False
+
+
 
 # ── HTTP Server ──────────────────────────────────────────────────
 
@@ -219,6 +286,21 @@ async def handle_http_request(reader: asyncio.StreamReader, writer: asyncio.Stre
         return
 
     
+    # ── Time Travel ──────────────────────────────────────────
+    elif method == "POST" and url_path == "/api/time-travel":
+        body = await reader.readexactly(content_length) if content_length else b""
+        try:
+            data = json.loads(body.decode())
+            offset = int(data.get("offset", 0))
+            task = asyncio.create_task(trigger_time_travel(offset))
+            task.add_done_callback(lambda t: t.exception() if not t.cancelled() and t.exception() else None)
+            writer.write(b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\n\r\n{"status":"ok"}')
+        except Exception:
+            writer.write(b"HTTP/1.1 400 Bad Request\r\n\r\n")
+        await writer.drain()
+        writer.close()
+        return
+
     # ── CORS Preflight ───────────────────────────────────────
     elif method == "OPTIONS":
         writer.write(b"HTTP/1.1 204 No Content\r\n")
