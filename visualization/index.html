@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Home Hub — Live Architecture</title>
     <meta name="description" content="Real-time visualization of the Smart Home Hub Pub/Sub broker architecture">
+    <!-- Safari/Mobile Theme Color -->
+    <meta name="theme-color" content="#0f172a">
+    <!-- Simple Emoji Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏠</text></svg>">
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
@@ -14,7 +19,7 @@
         <!-- Header -->
         <header class="header" id="header">
             <div class="header-left">
-                <div class="logo">🏠</div>
+                <div class="logo" aria-hidden="true">🏠</div>
                 <div>
                     <h1>Smart Home Hub</h1>
                     <div class="subtitle">Live Architecture Visualization</div>
@@ -25,8 +30,8 @@
                     <span class="status-dot" id="statusDot"></span>
                     <span id="statusText">Connecting…</span>
                 </div>
-                <div class="stat-pill">📨 <span id="msgCount" class="mono">0</span></div>
-                <div class="stat-pill">⏱ <span id="uptime" class="mono">0s</span></div>
+                <div class="stat-pill" aria-label="Total Messages">📨 <span id="msgCount" class="mono">0</span></div>
+                <div class="stat-pill" aria-label="Server Uptime">⏱ <span id="uptime" class="mono">0s</span></div>
             </div>
         </header>
 
@@ -42,7 +47,7 @@
             <div class="sidebar">
                 <!-- Throughput -->
                 <div class="panel">
-                    <div class="panel-header"><span class="panel-icon">📊</span> Live Throughput</div>
+                    <div class="panel-header"><span class="panel-icon" aria-hidden="true">📊</span> Live Throughput</div>
                     <div class="panel-body">
                         <div class="throughput-row">
                             <span class="throughput-value" id="throughputVal">0</span>
@@ -54,7 +59,7 @@
 
                 <!-- Priority Queue -->
                 <div class="panel">
-                    <div class="panel-header"><span class="panel-icon">🎯</span> Priority Queue</div>
+                    <div class="panel-header"><span class="panel-icon" aria-hidden="true">🎯</span> Priority Queue</div>
                     <div class="panel-body">
                         <div class="queue-feed" id="queueFeed">
                             <div class="queue-empty">Waiting for messages…</div>
@@ -64,31 +69,32 @@
 
                 <!-- Device Controls -->
                 <div class="panel">
-                    <div class="panel-header"><span class="panel-icon">🔧</span> Simulate Devices</div>
+                    <div class="panel-header"><span class="panel-icon" aria-hidden="true">🔧</span> Simulate Devices</div>
                     <div class="panel-body controls-grid">
-                        <button class="device-btn fire-btn" data-device="fire" id="btnFire">
+                        <button class="device-btn fire-btn" data-device="fire" id="btnFire" aria-label="Simulate Fire Alarm">
                             <span class="btn-icon">🔥</span><span class="btn-label">Fire Alarm</span><span class="btn-pri">255</span>
                         </button>
-                        <button class="device-btn temp-btn" data-device="temperature" id="btnTemp">
+                        <button class="device-btn temp-btn" data-device="temperature" id="btnTemp" aria-label="Simulate Temperature Sensor">
                             <span class="btn-icon">🌡️</span><span class="btn-label">Temperature</span><span class="btn-pri">50</span>
                         </button>
-                        <button class="device-btn door-btn" data-device="door" id="btnDoor">
+                        <button class="device-btn door-btn" data-device="door" id="btnDoor" aria-label="Simulate Door Sensor">
                             <span class="btn-icon">🚪</span><span class="btn-label">Door</span><span class="btn-pri">128</span>
                         </button>
-                        <button class="device-btn light-btn" data-device="light" id="btnLight">
+                        <button class="device-btn light-btn" data-device="light" id="btnLight" aria-label="Simulate Smart Light">
                             <span class="btn-icon">💡</span><span class="btn-label">Light</span><span class="btn-pri">30</span>
                         </button>
-                        <button class="device-btn burst-btn" data-device="burst" id="btnBurst">
-                            <span class="btn-icon">💣</span><span class="btn-label">QoS Burst</span><span class="btn-pri">MIX</span>
+                        <!-- Added style to make burst button span full width in grid -->
+                        <button class="device-btn burst-btn" data-device="burst" id="btnBurst" style="grid-column: 1 / -1;" aria-label="Trigger Quality of Service Burst">
+                            <span class="btn-icon">💣</span><span class="btn-label">QoS Burst (Stress Test)</span><span class="btn-pri">MIX</span>
                         </button>
                     </div>
                 </div>
 
                 <!-- Time Travel -->
                 <div class="panel">
-                    <div class="panel-header"><span class="panel-icon">⏪</span> Time-Travel</div>
+                    <div class="panel-header"><span class="panel-icon" aria-hidden="true">⏪</span> Time-Travel</div>
                     <div class="panel-body">
-                        <input type="range" class="slider" id="offsetSlider" min="0" max="1000" value="0">
+                        <input type="range" class="slider" id="offsetSlider" min="0" max="1000" value="0" aria-label="Time travel byte offset">
                         <div class="slider-labels">
                             <span>0B</span>
                             <span id="offsetCurrent" class="mono">0B</span>
@@ -104,7 +110,7 @@
         <div class="bottom-row">
             <!-- Protocol Inspector -->
             <div class="panel inspector-panel">
-                <div class="panel-header"><span class="panel-icon">📦</span> Protocol Inspector</div>
+                <div class="panel-header"><span class="panel-icon" aria-hidden="true">📦</span> Protocol Inspector</div>
                 <div class="panel-body">
                     <pre class="hex-display" id="hexDisplay">Waiting for message…</pre>
                     <div class="decoded-fields" id="decodedFields"></div>
@@ -114,7 +120,7 @@
             <!-- Message Feed -->
             <div class="panel feed-panel">
                 <div class="panel-header">
-                    <span><span class="panel-icon">📨</span> Live Message Feed</span>
+                    <span><span class="panel-icon" aria-hidden="true">📨</span> Live Message Feed</span>
                     <span class="feed-count" id="feedCount">0 messages</span>
                 </div>
                 <div class="feed" id="messageFeed">
