@@ -221,6 +221,68 @@ async def simulate_burst():
         return False
 
 
+async def trigger_time_travel(offset: int):
+    """Triggers a time travel replay from the broker."""
+    writer = None
+    try:
+        reader, writer = await asyncio.open_connection(BROKER_HOST, BROKER_PORT)
+        # Replay all topics by subscribing to home/fire as the trigger
+        tid = topic_hash("home/fire")
+        payload = struct.pack("!Q", offset)
+        writer.write(encode(CMD_TIME_TRAVEL, tid, 0, payload))
+        await writer.drain()
+
+        metrics_tid = topic_hash("broker/metrics")
+        replayed = 0
+        max_replay = 500
+        while replayed < max_replay:
+            try:
+                msg = await asyncio.wait_for(_read_one(reader), timeout=2.0)
+                if msg is None:
+                    break
+                cmd, t, pri, p, hdr = msg
+
+                # Skip internal metrics frames — only replay device messages
+                if t == metrics_tid:
+                    continue
+
+                topic_name = SMART_HOME_TOPICS.get(t)
+                if not topic_name:
+                    continue  # skip unknown topics
+
+                data = {
+                    "type": "time_travel_log",
+                    "topic": topic_name,
+                    "priority": pri,
+                    "payload": p.decode(errors='replace'),
+                    "hex": (hdr + p).hex(),
+                    "timestamp": time.time(),
+                    "history": True,
+                }
+                await broadcast_sse(data)
+                replayed += 1
+                # Small yield to let SSE drain to browser
+                if replayed % 10 == 0:
+                    await asyncio.sleep(0.05)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
+                break
+            except Exception as e:
+                log.warning(f"Time travel read error: {e}")
+                break
+
+        # Signal completion to browser
+        await broadcast_sse({"type": "time_travel_done", "replayed": replayed})
+        log.info(f"Time travel completed: replayed {replayed} messages from offset {offset}")
+    except Exception as e:
+        log.error(f"Time travel error: {e}")
+    finally:
+        if writer and not writer.is_closing():
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except Exception:
+                pass
+
 
 # ── HTTP Server ──────────────────────────────────────────────────
 
@@ -285,7 +347,25 @@ async def handle_http_request(reader: asyncio.StreamReader, writer: asyncio.Stre
                 writer.close()
         return
 
-    
+    # ── Simulate Device ──────────────────────────────────────
+    elif method == "POST" and url_path == "/api/simulate":
+        body = await reader.readexactly(content_length) if content_length else b""
+        try:
+            data = json.loads(body.decode())
+            device = data.get("device", "temperature")
+            if device == "burst":
+                task = asyncio.create_task(simulate_burst())
+                task.add_done_callback(lambda t: t.exception() if not t.cancelled() and t.exception() else None)
+            else:
+                task = asyncio.create_task(simulate_device(device))
+                task.add_done_callback(lambda t: t.exception() if not t.cancelled() and t.exception() else None)
+            writer.write(b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\n\r\n{"status":"ok"}')
+        except Exception:
+            writer.write(b"HTTP/1.1 400 Bad Request\r\n\r\n")
+        await writer.drain()
+        writer.close()
+        return
+
     # ── Time Travel ──────────────────────────────────────────
     elif method == "POST" and url_path == "/api/time-travel":
         body = await reader.readexactly(content_length) if content_length else b""
