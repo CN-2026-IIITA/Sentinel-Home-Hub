@@ -27,6 +27,7 @@ __all__ = ["PriorityRouter"]
 HeapEntry = tuple[int, int, Message]
 VISUALIZATION_DELAY_SECONDS = 0.05
 ERROR_BACKOFF_SECONDS = 1
+CLIENT_DRAIN_TIMEOUT_SECONDS = 5.0
 
 
 class PriorityRouter:
@@ -138,7 +139,10 @@ class PriorityRouter:
         for client_id, writer in subscribers:
             try:
                 writer.write(frame)
-                await asyncio.wait_for(writer.drain(), timeout=5.0)
+                await asyncio.wait_for(
+                    writer.drain(),
+                    timeout=CLIENT_DRAIN_TIMEOUT_SECONDS,
+                )
             except (ConnectionResetError, ConnectionAbortedError,
                     BrokenPipeError, OSError, asyncio.TimeoutError) as exc:
                 log.warning("Client %s unreachable (%s) — unregistering", client_id, exc)
