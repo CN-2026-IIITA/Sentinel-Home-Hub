@@ -24,6 +24,8 @@ log = logging.getLogger(__name__)
 
 __all__ = ["PriorityRouter"]
 
+HeapEntry = tuple[int, int, Message]
+
 
 class PriorityRouter:
     """
@@ -39,7 +41,7 @@ class PriorityRouter:
             The live connection registry used to look up subscribers.
         """
         self._registry = registry
-        self._heap: list[tuple[int, int, Message]] = []
+        self._heap: list[HeapEntry] = []
         self._seq: int = 0                      # monotonic tie-breaker
         self._event = asyncio.Event()            # signals the worker
         self._running: bool = False
