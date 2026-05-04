@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Hub — Live Architecture</title>
+    <meta name="description" content="Real-time visualization of the Smart Home Hub Pub/Sub broker architecture">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app" id="app">
+        <!-- Header -->
+        <header class="header" id="header">
+            <div class="header-left">
+                <div class="logo">🏠</div>
+                <div>
+                    <h1>Smart Home Hub</h1>
+                    <div class="subtitle">Live Architecture Visualization</div>
+                </div>
+            </div>
+            <div class="header-stats">
+                <div class="stat-pill" id="statusPill">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span id="statusText">Connecting…</span>
+                </div>
+                <div class="stat-pill">📨 <span id="msgCount" class="mono">0</span></div>
+                <div class="stat-pill">⏱ <span id="uptime" class="mono">0s</span></div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-layout">
+            <!-- Network Topology Canvas -->
+            <div class="topology-container" id="topologyContainer">
+                <div class="topology-badge">LIVE TOPOLOGY</div>
+                <canvas id="topologyCanvas"></canvas>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <!-- Throughput -->
+                <div class="panel">
+                    <div class="panel-header"><span class="panel-icon">📊</span> Live Throughput</div>
+                    <div class="panel-body">
+                        <div class="throughput-row">
+                            <span class="throughput-value" id="throughputVal">0</span>
+                            <span class="throughput-unit">msg/s</span>
+                        </div>
+                        <div class="chart-wrap"><canvas id="throughputChart"></canvas></div>
+                    </div>
+                </div>
+
+                <!-- Priority Queue -->
+                <div class="panel">
+                    <div class="panel-header"><span class="panel-icon">🎯</span> Priority Queue</div>
+                    <div class="panel-body">
+                        <div class="queue-feed" id="queueFeed">
+                            <div class="queue-empty">Waiting for messages…</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Device Controls -->
+                <div class="panel">
+                    <div class="panel-header"><span class="panel-icon">🔧</span> Simulate Devices</div>
+                    <div class="panel-body controls-grid">
+                        <button class="device-btn fire-btn" data-device="fire" id="btnFire">
+                            <span class="btn-icon">🔥</span><span class="btn-label">Fire Alarm</span><span class="btn-pri">255</span>
+                        </button>
+                        <button class="device-btn temp-btn" data-device="temperature" id="btnTemp">
+                            <span class="btn-icon">🌡️</span><span class="btn-label">Temperature</span><span class="btn-pri">50</span>
+                        </button>
+                        <button class="device-btn door-btn" data-device="door" id="btnDoor">
+                            <span class="btn-icon">🚪</span><span class="btn-label">Door</span><span class="btn-pri">128</span>
+                        </button>
+                        <button class="device-btn light-btn" data-device="light" id="btnLight">
+                            <span class="btn-icon">💡</span><span class="btn-label">Light</span><span class="btn-pri">30</span>
+                        </button>
+                        <button class="device-btn burst-btn" data-device="burst" id="btnBurst">
+                            <span class="btn-icon">💣</span><span class="btn-label">QoS Burst</span><span class="btn-pri">MIX</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Time Travel -->
+                <div class="panel">
+                    <div class="panel-header"><span class="panel-icon">⏪</span> Time-Travel</div>
+                    <div class="panel-body">
+                        <input type="range" class="slider" id="offsetSlider" min="0" max="1000" value="0">
+                        <div class="slider-labels">
+                            <span>0B</span>
+                            <span id="offsetCurrent" class="mono">0B</span>
+                            <span id="offsetMax" class="mono">…</span>
+                        </div>
+                        <button class="replay-btn" id="btnReplay">⏪ Replay History</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Protocol Inspector + Message Feed -->
+        <div class="bottom-row">
+            <!-- Protocol Inspector -->
+            <div class="panel inspector-panel">
+                <div class="panel-header"><span class="panel-icon">📦</span> Protocol Inspector</div>
+                <div class="panel-body">
+                    <pre class="hex-display" id="hexDisplay">Waiting for message…</pre>
+                    <div class="decoded-fields" id="decodedFields"></div>
+                </div>
+            </div>
+
+            <!-- Message Feed -->
+            <div class="panel feed-panel">
+                <div class="panel-header">
+                    <span><span class="panel-icon">📨</span> Live Message Feed</span>
+                    <span class="feed-count" id="feedCount">0 messages</span>
+                </div>
+                <div class="feed" id="messageFeed">
+                    <div class="feed-empty">
+                        <div class="feed-empty-icon">📡</div>
+                        <p>No messages yet. Start the broker and simulator!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
