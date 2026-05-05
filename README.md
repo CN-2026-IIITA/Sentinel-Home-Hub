@@ -1,8 +1,8 @@
-#  Smart Home Hub — Pub/Sub Message Broker
+# 🏠 Smart Home Hub — Pub/Sub Message Broker
 
 A **zero-dependency**, high-performance Publish/Subscribe message broker for IoT smart home devices, built entirely on Python's standard library.
 
-> "The brain of a smart home — routes critical alerts first, remembers every event forever, and lets you time-travel to any moment in history."
+> *"The brain of a smart home — routes critical alerts first, remembers every event forever, and lets you time-travel to any moment in history."*
 
 ---
 
@@ -51,7 +51,7 @@ A **zero-dependency**, high-performance Publish/Subscribe message broker for IoT
 
 ---
 
-##  System Diagrams (Mermaid)
+## 📊 System Diagrams (Mermaid)
 
 The following diagrams provide a visual breakdown of the Sentinel Home Hub's internal workings, connections, and lifecycle. These will automatically render on GitHub.
 
@@ -61,32 +61,32 @@ Illustrates the flow of messages from publisher devices to the broker, and final
 ```mermaid
 graph TD
     %% Publishers
-    subgraph Publishers ["Smart Devices / Sensors"]
-        T["🌡️ Temperature Sensor"]
-        F["🔥 Fire Alarm"]
-        D["🚪 Door Sensor"]
-        L_PUB["💡 Smart Light"]
+    subgraph Publishers [Smart Devices / Sensors]
+        T[🌡️ Temperature Sensor]
+        F[🔥 Fire Alarm]
+        D[🚪 Door Sensor]
+        L_PUB[💡 Smart Light]
     end
 
     %% Broker
-    B(("Sentinel Broker<br/>Port 9999"))
+    B((Sentinel Broker\nPort 9999))
 
     %% Subscribers
-    subgraph Subscribers ["Clients / Dashboard"]
-        A["📱 Phone App"]
-        DASH["🖥️ Live Dashboard"]
-        S["🔔 Alert System"]
+    subgraph Subscribers [Clients / Dashboard]
+        A[📱 Phone App]
+        DASH[🖥️ Live Dashboard]
+        S[🔔 Alert System]
     end
 
     %% Flow
-    T -- "home/temperature" --> B
-    F -- "home/fire — Priority 255" --> B
-    D -- "home/door" --> B
-    L_PUB -- "home/light" --> B
+    T -- home/temperature --> B
+    F -- home/fire (Priority 255) --> B
+    D -- home/door --> B
+    L_PUB -- home/light --> B
 
-    B -- "Routes by Topic" --> A
-    B -- "SSE Stream" --> DASH
-    B -- "Critical Alerts Only" --> S
+    B -- Routes by Topic --> A
+    B -- SSE Stream --> DASH
+    B -- Critical Alerts Only --> S
 ```
 
 ### 2. Activity Diagram: Device Lifecycle
@@ -158,19 +158,19 @@ Demonstrates how the broker processes a critical fire alarm over a routine batte
 sequenceDiagram
     participant S1 as Temp Sensor
     participant S2 as Fire Alarm
-    participant B as Broker - QoS Engine
-    participant C as Phone App - All Topics
+    participant B as Broker (QoS Engine)
+    participant C as Phone App (Sub: #)
 
-    C->>B: Connect and Subscribe
+    C->>B: Connect & Subscribe (All Topics)
     
-    S1->>B: Publish home/temp, Priority 50
-    S2->>B: Publish home/fire, Priority 255
+    S1->>B: Publish (home/temp, Priority: 50)
+    S2->>B: Publish (home/fire, Priority: 255)
     
     Note over B: QoS Min-Heap processing
-    B->>B: Sort by Priority — 255 beats 50
+    B->>B: Sort by Priority (255 > 50)
     
-    B->>C: Route home/fire ALARM First!
-    B->>C: Route home/temp Reading Second
+    B->>C: Route 'home/fire' ALARM First!
+    B->>C: Route 'home/temp' Reading Second
 ```
 
 ### 5. Component Architecture
@@ -179,26 +179,29 @@ A breakdown of the internal Python modules inside the Sentinel Hub.
 ```mermaid
 flowchart TD
     subgraph Network Layer
-        TCP["TCP Socket Server<br/>asyncio"]
+        TCP[TCP Socket Server<br><code>asyncio</code>]
     end
 
     subgraph Core Broker Logic
-        Parser["Protocol Decoder<br/>struct"]
-        QoS["Priority Router<br/>heapq"]
+        Parser[Protocol Decoder<br><code>struct</code>]
+        QoS[Priority Router<br><code>heapq</code>]
     end
 
-    subgraph Data and Storage
-        State["Subscriber Registry<br/>hashlib"]
-        Log[("Append-Only Event Log<br/>broker_log.bin")]
+    subgraph Data & Storage
+        State[Subscriber Registry<br><code>hashlib</code>]
+        Log[(Append-Only Event Log<br><code>broker_log.bin</code>)]
     end
 
-    TCP -- "Byte Stream" --> Parser
-    Parser -- "Parsed Messages" --> QoS
-    QoS -- "Enqueue" --> Router["Async Fan-Out Worker"]
-    Router -- "Lookup" --> State
-    Router -- "Persist" --> Log
-    Router -- "Deliver" --> TCP
+    TCP -- Byte Stream --> Parser
+    Parser -- Parsed Messages --> QoS
+    QoS -- Enqueue --> Router[Async Fan-Out Worker]
+    Router -- Lookup --> State
+    Router -- Persist --> Log
+    Router -- Deliver --> TCP
 ```
+### 6.Real - world Showcase
+
+![Smart Home Network: Priority-Aware Routing Diagram](./architecture_diagram.png)
 
 ---
 
@@ -265,7 +268,7 @@ python smart_home_simulator.py
 You should see:
 
 ```
- Smart Home IoT Device Simulator
+🏠 Smart Home IoT Device Simulator
 Devices:
   🌡️  Temperature Sensor  (every 2s,   priority 50)
   🔥  Fire Alarm          (every 30s,  priority 10/255)
@@ -284,7 +287,7 @@ Devices:
 
 ## Interactive Demo Features
 
-###  Device Control Buttons
+### 🔧 Device Control Buttons
 
 Click buttons in the **Simulate Devices** panel to manually trigger IoT events:
 
@@ -298,7 +301,7 @@ Click buttons in the **Simulate Devices** panel to manually trigger IoT events:
 
 When you click a button, watch the **animated particle** travel from the device node → broker → all subscribers.
 
-###  Protocol Inspector
+### 📦 Protocol Inspector
 
 The bottom-left panel shows the **raw binary protocol** of the last message:
 
@@ -315,7 +318,7 @@ PAYLOAD "🔥 FIRE DETECTED in sector 7G!"
 TOTAL   42 bytes (JSON: ~80 bytes → 48% smaller)
 ```
 
-###  Time-Travel Replay
+### ⏪ Time-Travel Replay
 
 Time-Travel lets you **replay historical messages** from the binary event log.
 
