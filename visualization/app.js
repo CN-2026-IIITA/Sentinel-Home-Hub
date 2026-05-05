@@ -55,6 +55,7 @@ const COLORS = {
     fire: '#f43f5e', temperature: '#06b6d4', door: '#f59e0b',
     light: '#a855f7', battery: '#10b981', broker: '#6366f1',
     phone: '#10b981', dashboard: '#0ea5e9', alert: '#f97316',
+    watch: '#34d399', db: '#9ca3af'
 };
 
 const NODES = {
@@ -64,14 +65,16 @@ const NODES = {
     light: { x: 0.07, y: 0.64, icon: '💡', label: 'Smart Light', color: COLORS.light, type: 'pub' },
     battery: { x: 0.07, y: 0.82, icon: '🔋', label: 'Battery', color: COLORS.battery, type: 'pub' },
     broker: { x: 0.46, y: 0.48, icon: '🏠', label: 'Smart Home Hub', color: COLORS.broker, type: 'broker', sublabel: 'Port 9999 (TCP)' },
-    phone: { x: 0.88, y: 0.18, icon: '📱', label: 'Phone App', color: COLORS.phone, type: 'sub' },
-    dashboard: { x: 0.88, y: 0.50, icon: '🖥️', label: 'Dashboard', color: COLORS.dashboard, type: 'sub' },
+    smartWatch: { x: 0.88, y: 0.10, icon: '⌚', label: 'Smart Watch', color: COLORS.watch, type: 'sub' },
+    phone: { x: 0.88, y: 0.28, icon: '📱', label: 'Phone App', color: COLORS.phone, type: 'sub' },
+    dashboard: { x: 0.88, y: 0.46, icon: '🖥️', label: 'Dashboard', color: COLORS.dashboard, type: 'sub' },
+    dbLogger: { x: 0.88, y: 0.64, icon: '💾', label: 'DB Logger', color: COLORS.db, type: 'sub' },
     alertSys: { x: 0.88, y: 0.82, icon: '⚠️', label: 'Alert System', color: COLORS.alert, type: 'sub' },
 };
 
 const CONNECTIONS = [
     ['temperature', 'broker'], ['fire', 'broker'], ['door', 'broker'], ['light', 'broker'], ['battery', 'broker'],
-    ['broker', 'phone'], ['broker', 'dashboard'], ['broker', 'alertSys'],
+    ['broker', 'smartWatch'], ['broker', 'phone'], ['broker', 'dashboard'], ['broker', 'dbLogger'], ['broker', 'alertSys'],
 ];
 
 const TOPIC_NODE_MAP = {
@@ -164,7 +167,7 @@ function spawnMessage(topic, priority, payload) {
     const p1 = new Particle(pubKey, 'broker', color, priority);
     p1.onArrive = () => {
         nodeGlows['broker'] = { intensity: 1, color: color, decay: 0.025 };
-        const subs = ['phone', 'dashboard', 'alertSys'];
+        const subs = ['smartWatch', 'phone', 'dashboard', 'dbLogger', 'alertSys'];
         subs.forEach((sub, i) => {
             setTimeout(() => {
                 if (!isTabVisible || particles.length > MAX_PARTICLES) return;
