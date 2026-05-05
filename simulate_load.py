@@ -7,7 +7,7 @@ async def simulate():
     tid_fire = topic_hash("home/fire")
     tid_battery = topic_hash("home/battery")
     
-    while True:
+    for i in range(10):
         try:
             reader, writer = await asyncio.open_connection("127.0.0.1", 9999)
             
@@ -25,7 +25,7 @@ async def simulate():
             writer.write(burst_data)
             await writer.drain()
             
-            print("Burst of 20 messages sent over 1 socket! Waiting 5 seconds...")
+            print(f"[{i+1}/10] Burst of 20 messages sent over 1 socket! Waiting 5 seconds...")
             writer.close()
             await writer.wait_closed()
             
@@ -34,6 +34,8 @@ async def simulate():
         except ConnectionRefusedError:
             print("Broker offline. Retrying in 5 seconds...")
             await asyncio.sleep(5)
+
+    print("Simulation completed. Sent 10 bursts successfully. Exiting now.")
 
 if __name__ == "__main__":
     asyncio.run(simulate())

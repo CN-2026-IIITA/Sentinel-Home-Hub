@@ -23,8 +23,19 @@ const offsetSlider = document.getElementById('offsetSlider');
 const offsetCurrent = document.getElementById('offsetCurrent');
 const offsetMax = document.getElementById('offsetMax');
 
+const fireCountEl = document.getElementById('fireCount');
+const tempCountEl = document.getElementById('tempCount');
+const batteryCountEl = document.getElementById('batteryCount');
+const doorCountEl = document.getElementById('doorCount');
+const lightCountEl = document.getElementById('lightCount');
+
 // ── State & Safeguards ──────────────────────────────────────────
 let totalMessages = 0;
+let fireMessages = 0;
+let tempMessages = 0;
+let batteryMessages = 0;
+let doorMessages = 0;
+let lightMessages = 0;
 let startTime = Date.now();
 let maxLogOffset = 0;
 const throughputHistory = Array(60).fill(0);
@@ -47,10 +58,11 @@ const COLORS = {
 };
 
 const NODES = {
-    temperature: { x: 0.07, y: 0.15, icon: '🌡️', label: 'Temperature', color: COLORS.temperature, type: 'pub' },
-    fire: { x: 0.07, y: 0.38, icon: '🔥', label: 'Fire Alarm', color: COLORS.fire, type: 'pub' },
-    door: { x: 0.07, y: 0.61, icon: '🚪', label: 'Door Sensor', color: COLORS.door, type: 'pub' },
-    light: { x: 0.07, y: 0.84, icon: '💡', label: 'Smart Light', color: COLORS.light, type: 'pub' },
+    temperature: { x: 0.07, y: 0.10, icon: '🌡️', label: 'Temperature', color: COLORS.temperature, type: 'pub' },
+    fire: { x: 0.07, y: 0.28, icon: '🔥', label: 'Fire Alarm', color: COLORS.fire, type: 'pub' },
+    door: { x: 0.07, y: 0.46, icon: '🚪', label: 'Door Sensor', color: COLORS.door, type: 'pub' },
+    light: { x: 0.07, y: 0.64, icon: '💡', label: 'Smart Light', color: COLORS.light, type: 'pub' },
+    battery: { x: 0.07, y: 0.82, icon: '🔋', label: 'Battery', color: COLORS.battery, type: 'pub' },
     broker: { x: 0.46, y: 0.48, icon: '🏠', label: 'Smart Home Hub', color: COLORS.broker, type: 'broker', sublabel: 'Port 9999 (TCP)' },
     phone: { x: 0.88, y: 0.18, icon: '📱', label: 'Phone App', color: COLORS.phone, type: 'sub' },
     dashboard: { x: 0.88, y: 0.50, icon: '🖥️', label: 'Dashboard', color: COLORS.dashboard, type: 'sub' },
@@ -58,13 +70,13 @@ const NODES = {
 };
 
 const CONNECTIONS = [
-    ['temperature', 'broker'], ['fire', 'broker'], ['door', 'broker'], ['light', 'broker'],
+    ['temperature', 'broker'], ['fire', 'broker'], ['door', 'broker'], ['light', 'broker'], ['battery', 'broker'],
     ['broker', 'phone'], ['broker', 'dashboard'], ['broker', 'alertSys'],
 ];
 
 const TOPIC_NODE_MAP = {
     'home/fire': 'fire', 'home/temperature': 'temperature',
-    'home/door': 'door', 'home/light': 'light', 'home/battery': 'temperature',
+    'home/door': 'door', 'home/light': 'light', 'home/battery': 'battery',
 };
 
 // ── Particle System ─────────────────────────────────────────────
@@ -372,8 +384,28 @@ function addFeedMessage(topic, priority, payload, timestamp, isHistory) {
     messageFeed.insertBefore(el, messageFeed.firstChild);
     while (messageFeed.children.length > MAX_FEED_ITEMS) messageFeed.removeChild(messageFeed.lastChild);
 
-    totalMessages++;
-    msgCountEl.textContent = totalMessages;
+    if (!isHistory) {
+        totalMessages++;
+        msgCountEl.textContent = totalMessages;
+        
+        if (topic.includes('fire')) {
+            fireMessages++;
+            if (fireCountEl) fireCountEl.textContent = fireMessages;
+        } else if (topic.includes('temperature')) {
+            tempMessages++;
+            if (tempCountEl) tempCountEl.textContent = tempMessages;
+        } else if (topic.includes('battery')) {
+            batteryMessages++;
+            if (batteryCountEl) batteryCountEl.textContent = batteryMessages;
+        } else if (topic.includes('door')) {
+            doorMessages++;
+            if (doorCountEl) doorCountEl.textContent = doorMessages;
+        } else if (topic.includes('light')) {
+            lightMessages++;
+            if (lightCountEl) lightCountEl.textContent = lightMessages;
+        }
+    }
+    
     feedCountEl.textContent = totalMessages + ' messages';
 }
 

@@ -314,6 +314,7 @@ body::after {
 .temp-btn:hover { border-color: var(--temp); box-shadow: 0 8px 24px var(--temp-bg), inset 0 0 12px var(--temp-bg); }
 .door-btn:hover { border-color: var(--door); box-shadow: 0 8px 24px var(--door-bg), inset 0 0 12px var(--door-bg); }
 .light-btn:hover { border-color: var(--light); box-shadow: 0 8px 24px var(--light-bg), inset 0 0 12px var(--light-bg); }
+.battery-btn:hover { border-color: var(--battery); box-shadow: 0 8px 24px var(--battery-bg), inset 0 0 12px var(--battery-bg); }
 
 /* Animated QoS Burst Button */
 .burst-btn { 

@@ -30,6 +30,11 @@
                     <span class="status-dot" id="statusDot"></span>
                     <span id="statusText">Connecting…</span>
                 </div>
+                <div class="stat-pill" aria-label="Fire">🔥 <span id="fireCount" class="mono">0</span></div>
+                <div class="stat-pill" aria-label="Temperature">🌡️ <span id="tempCount" class="mono">0</span></div>
+                <div class="stat-pill" aria-label="Battery">🔋 <span id="batteryCount" class="mono">0</span></div>
+                <div class="stat-pill" aria-label="Door">🚪 <span id="doorCount" class="mono">0</span></div>
+                <div class="stat-pill" aria-label="Light">💡 <span id="lightCount" class="mono">0</span></div>
                 <div class="stat-pill" aria-label="Total Messages">📨 <span id="msgCount" class="mono">0</span></div>
                 <div class="stat-pill" aria-label="Server Uptime">⏱ <span id="uptime" class="mono">0s</span></div>
             </div>
@@ -82,6 +87,9 @@
                         </button>
                         <button class="device-btn light-btn" data-device="light" id="btnLight" aria-label="Simulate Smart Light">
                             <span class="btn-icon">💡</span><span class="btn-label">Light</span><span class="btn-pri">30</span>
+                        </button>
+                        <button class="device-btn battery-btn" data-device="battery" id="btnBattery" aria-label="Simulate Battery">
+                            <span class="btn-icon">🔋</span><span class="btn-label">Battery</span><span class="btn-pri">0</span>
                         </button>
                         <!-- Added style to make burst button span full width in grid -->
                         <button class="device-btn burst-btn" data-device="burst" id="btnBurst" style="grid-column: 1 / -1;" aria-label="Trigger Quality of Service Burst">
