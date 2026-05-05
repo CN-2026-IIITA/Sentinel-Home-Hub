@@ -263,6 +263,7 @@ function drawTopology() {
         ctx.font = isBroker ? '22px sans-serif' : '18px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
         ctx.fillText(node.icon, nx, ny - (isBroker ? 4 : 0));
 
         ctx.font = '600 11px Inter, sans-serif';
@@ -333,7 +334,7 @@ function addToQueue(topic, priority, payload) {
     const priLabel = priority >= 200 ? 'critical' : priority >= 128 ? 'high' : priority >= 64 ? 'medium' : 'low';
 
     queueItems.unshift({ topic, priority, priLabel, payload });
-    if (queueItems.length > 20) queueItems.pop();
+    if (queueItems.length > 60) queueItems.pop();
 
     if (queueUpdateTimer) return;
     queueUpdateTimer = setTimeout(() => {
