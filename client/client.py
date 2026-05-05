@@ -72,15 +72,17 @@ async def _listen(reader: asyncio.StreamReader) -> None:
 # ═════════════════════════════════════════════════════════════════
 
 async def mode_subscribe(host: str, port: int, topic: str) -> None:
-    """Subscribe to a topic and listen for incoming messages."""
-    tid = topic_hash(topic)
+    """Subscribe to a topic (or multiple comma-separated topics) and listen."""
     reader, writer = await asyncio.open_connection(host, port)
-    log.info("Connected — subscribing to '%s' (topic_id=%d)", topic, tid)
-
-    frame = encode(CMD_SUBSCRIBE, tid, 0)
-    writer.write(frame)
+    
+    topics = [t.strip() for t in topic.split(",") if t.strip()]
+    for t in topics:
+        tid = topic_hash(t)
+        log.info("Connected — subscribing to '%s' (topic_id=%d)", t, tid)
+        frame = encode(CMD_SUBSCRIBE, tid, 0)
+        writer.write(frame)
+        
     await writer.drain()
-
     await _listen(reader)
     writer.close()
     await writer.wait_closed()
