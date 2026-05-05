@@ -46,13 +46,6 @@ class Message(NamedTuple):
 # ── Public helpers ────────────────────────────────────────────────
 
 def topic_hash(topic: str) -> int:
-    """
-    Hash a human-readable topic string into a 32-bit unsigned integer.
-
-    Uses the first 4 bytes of an MD5 digest for uniform distribution.
-    Collisions are possible (~50 % at ~77 K topics) but acceptable
-    for this broker's scope.
-    """
     digest = hashlib.md5(topic.encode("utf-8")).digest()
     return struct.unpack("!I", digest[:4])[0]
 
